@@ -1,9 +1,18 @@
-"""Anthropic (Claude) client — sends Google Ads data to Claude for analysis."""
+"""Anthropic (Claude) client — sends Google Ads data to Claude for analysis.
+
+Supports two analysis modes:
+  - ROAS: e-commerce / revenue-focused optimization
+  - Lead Gen: lead generation / CPA-focused optimization
+"""
 
 import json
+from typing import Literal
+
 import anthropic
 
 from src.config import config
+
+AnalysisMode = Literal["roas", "leadgen"]
 
 _client: anthropic.Anthropic | None = None
 
@@ -15,22 +24,71 @@ def _get_client() -> anthropic.Anthropic:
     return _client
 
 
-SYSTEM_PROMPT = """\
-You are a senior Google Ads strategist and data analyst.
-You receive structured Google Ads performance data (JSON) and provide:
-  • Clear, actionable insights
-  • Specific optimization recommendations with expected impact
-  • Budget reallocation suggestions when relevant
-  • Keyword and ad-copy improvement ideas
-Keep answers concise and data-driven. Use numbers from the data to support every claim.
+# ── System prompts per mode ──────────────────────────────────────────────────
+
+SYSTEM_PROMPT_ROAS = """\
+You are a senior Google Ads strategist specializing in e-commerce and ROAS optimization.
+You receive structured Google Ads performance data (JSON) spanning the full funnel:
+campaigns, ad groups, ads, keywords, and search terms.
+
+Your analysis must focus on:
+  • ROAS (Return on Ad Spend) at every level — flag anything below target
+  • Revenue-driving keywords and search terms vs. wasted spend
+  • Product/ad-group level profitability — which ad groups and ads generate the most revenue per dollar
+  • Shopping/PMax campaign structure improvements when applicable
+  • Bid strategy recommendations (target ROAS, maximize conversion value)
+  • Budget reallocation from low-ROAS to high-ROAS segments
+  • Ad copy and headline testing ideas to improve conversion rates
+  • Negative keyword opportunities from the search term report (terms with spend but no revenue)
+
+Key metrics to prioritize: ROAS, conversion value, cost, cost per conversion, conversion rate.
+Always reference specific numbers from the data. Be concise and actionable.
 """
 
+SYSTEM_PROMPT_LEADGEN = """\
+You are a senior Google Ads strategist specializing in lead generation campaigns.
+You receive structured Google Ads performance data (JSON) spanning the full funnel:
+campaigns, ad groups, ads, keywords, and search terms.
 
-def analyze(data: dict | list, user_question: str | None = None) -> str:
+Your analysis must focus on:
+  • Cost per lead (CPL / cost per conversion) at every level — flag anything above target
+  • Lead volume vs. cost efficiency tradeoffs
+  • Which keywords and search terms drive the most leads at the lowest cost
+  • Ad group structure — are leads concentrated or spread across groups?
+  • Ad copy performance — which headlines and descriptions convert best for lead gen
+  • Landing page URL analysis — are different final URLs performing differently?
+  • Bid strategy recommendations (target CPA, maximize conversions)
+  • Budget reallocation from high-CPL to low-CPL segments
+  • Negative keyword opportunities from the search term report (terms with spend but no leads)
+  • Geographic, device, or schedule patterns if visible in the data
+
+Key metrics to prioritize: conversions (leads), cost per conversion (CPL), CTR, conversion rate.
+Always reference specific numbers from the data. Be concise and actionable.
+"""
+
+SYSTEM_PROMPTS: dict[AnalysisMode, str] = {
+    "roas": SYSTEM_PROMPT_ROAS,
+    "leadgen": SYSTEM_PROMPT_LEADGEN,
+}
+
+
+def _get_system_prompt(mode: AnalysisMode) -> str:
+    return SYSTEM_PROMPTS[mode]
+
+
+# ── Public API ───────────────────────────────────────────────────────────────
+
+
+def analyze(
+    data: dict | list,
+    mode: AnalysisMode = "roas",
+    user_question: str | None = None,
+) -> str:
     """Send Google Ads data to Claude and return the analysis text.
 
     Args:
         data: The Google Ads data (campaigns, keywords, etc.) as a dict/list.
+        mode: Analysis mode — "roas" or "leadgen".
         user_question: Optional follow-up question to ask about the data.
 
     Returns:
@@ -47,17 +105,22 @@ def analyze(data: dict | list, user_question: str | None = None) -> str:
     message = client.messages.create(
         model=config.anthropic.model,
         max_tokens=4096,
-        system=SYSTEM_PROMPT,
+        system=_get_system_prompt(mode),
         messages=[{"role": "user", "content": user_content}],
     )
     return message.content[0].text
 
 
-def chat(messages: list[dict], google_ads_context: dict | list | None = None) -> str:
+def chat(
+    messages: list[dict],
+    mode: AnalysisMode = "roas",
+    google_ads_context: dict | list | None = None,
+) -> str:
     """Multi-turn conversation with optional Google Ads context.
 
     Args:
         messages: List of {"role": "user"|"assistant", "content": "..."} dicts.
+        mode: Analysis mode — "roas" or "leadgen".
         google_ads_context: Optional data to include as context at the start.
 
     Returns:
@@ -65,7 +128,7 @@ def chat(messages: list[dict], google_ads_context: dict | list | None = None) ->
     """
     client = _get_client()
 
-    system = SYSTEM_PROMPT
+    system = _get_system_prompt(mode)
     if google_ads_context:
         system += (
             f"\n\nCurrent Google Ads data for reference:\n"
