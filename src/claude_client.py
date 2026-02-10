@@ -5,6 +5,8 @@ Supports two analysis modes:
   - Lead Gen: lead generation / CPA-focused optimization
 """
 
+from __future__ import annotations
+
 import json
 from typing import Literal
 

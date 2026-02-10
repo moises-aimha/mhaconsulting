@@ -1,5 +1,7 @@
 """Google Ads API client — fetches the full funnel: campaigns → ad groups → ads → keywords → search terms."""
 
+from __future__ import annotations
+
 from google.ads.googleads.client import GoogleAdsClient
 from google.ads.googleads.errors import GoogleAdsException
 

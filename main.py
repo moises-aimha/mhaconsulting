@@ -5,6 +5,8 @@ Every command starts by asking whether the account is ROAS-based or Lead Gen-bas
 then fetches the appropriate data and sends it to Claude with the right prompt.
 """
 
+from __future__ import annotations
+
 import argparse
 import sys
 

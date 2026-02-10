@@ -1,5 +1,7 @@
 """Bridge module — pulls full-funnel data from Google Ads and sends it to Claude for analysis."""
 
+from __future__ import annotations
+
 from src.claude_client import AnalysisMode, analyze, chat
 from src.google_ads_client import (
     get_account_summary,

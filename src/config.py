@@ -1,4 +1,7 @@
+"""Loads environment variables into a typed Pydantic config."""
+
 import os
+
 from dotenv import load_dotenv
 from pydantic import BaseModel
 
@@ -16,7 +19,7 @@ class GoogleAdsConfig(BaseModel):
 
 class AnthropicConfig(BaseModel):
     api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
-    model: str = "claude-sonnet-4-20250514"
+    model: str = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5-20250929")
 
 
 class AppConfig(BaseModel):
